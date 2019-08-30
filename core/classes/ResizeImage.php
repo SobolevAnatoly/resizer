@@ -17,13 +17,15 @@ class ResizeImage {
 	public $origHeight;
 	public $resizeWidth;
 	public $resizeHeight;
+	public $tempImage;
+	public $contentImage;
 
 	/**
 	 * Class constructor requires to send through the image filename
 	 *
 	 * @param string $filename - Filename of the image you want to resize
 	 */
-	public function __construct( $filename = null ) {
+	public function checkImage( $filename = null ) {
 		if ( !empty( $filename ) ) {
 			$this->setImage( $filename );
 		}
@@ -35,8 +37,10 @@ class ResizeImage {
 	 * @param string $filename - The image filename
 	 */
 	private function setImage( $filename ) {
+
 		$size = getimagesize( $filename );
 		$this->ext = $size['mime'];
+
 		switch ( $this->ext ) {
 			// Image is a JPG
 			case 'image/jpg':
@@ -68,7 +72,9 @@ class ResizeImage {
 	 *
 	 * @return Saves the image
 	 */
-	public function saveImage( $savePath = null, $imageQuality = "100", $download = true ) {
+	public function saveImage( $savePath = null, $imageQuality = "100" ) {
+
+		ob_start();
 		switch ( $this->ext ) {
 			case 'image/jpg':
 			case 'image/jpeg':
@@ -91,13 +97,16 @@ class ResizeImage {
 				}
 				break;
 		}
-		if ( $download ) {
-			header( 'Content-Description: File Transfer' );
-			header( "Content-type: application/octet-stream" );
-			header( "Content-disposition: attachment; filename= " . $savePath . "" );
-			readfile( $savePath );
-		}
 		imagedestroy( $this->newImage );
+		
+		$content = base64_encode( ob_get_clean() );
+		
+		header( 'Content-Type: image/png' );
+		header( 'Content-Description: File Transfer' );
+		header( "Content-type: application/octet-stream" );
+		header( "Content-disposition: attachment; filename= " . $savePath . "" );
+
+		$this->contentImage = $content;
 	}
 
 	/**

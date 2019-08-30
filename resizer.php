@@ -3,94 +3,68 @@
 /*
   Plugin Name: Resizer
   Plugin URI: https://github.com/SobolevAnatoly/resizer
-  Description: Resize images by link
-  Version: 0.0.1 Beta
+  Description: Resize images by link: http://www.example.site/?action=image_resize&image_id=17&width=800&height=306
+  Version: 1.0.0
   Author: Barbarian
-  Author URI:
+  Author URI: https://github.com/SobolevAnatoly/
   License: GPLv2
  */
 
 namespace resizer;
-
-use resizer\core\classes\ResizeImage;
-
-require_once plugin_dir_path( __FILE__ ) . 'core/classes/ResizeImage.php';
 
 /**
  * Description of Resize_REST_Posts_Controller
  *
  * @author Barbarian <barbarian.soft@gmail.com>
  */
-class ResizeAJAX extends ResizeImage {
+class ResizeAJAX {
+
+	public $imageId;
+	public $imageWidth;
+	public $imageHeight;
+	public $imagePath;
+	public $imageOptions;
 
 	public static function resizeInit() {
 		$instance = new self;
 
-		add_action( 'wp_ajax_image_resize', [ $instance, 'resizeActionCallback' ] );
-		add_action( 'wp_ajax_nopriv_image_resize', [ $instance, 'resizeActionCallback' ] );
-		add_action( 'admin_print_footer_scripts', [ $instance, 'resizeActionJavascript' ], 99 );
-		if ( !is_admin() ) {
-			add_action( 'wp_enqueue_scripts', [ $instance, 'ajaxHeader' ], 99 );
-			add_action( 'print_footer_scripts', [ $instance, 'resizeActionJavascript' ], 99 );
+		add_action( 'query_vars', [ $instance, 'resizeQueryVars' ] );
+		add_action( 'pre_get_posts', [ $instance, 'resizeUrl' ], 99 );
+	}
+
+	public static function resizeQueryVars() {
+
+		$vars[] = "action";
+		$vars[] = "image_id";
+		$vars[] = "width";
+		$vars[] = "height";
+
+		return $vars;
+	}
+
+	public function resizeUrl() {
+		
+		$action = get_query_var( 'action' );
+		
+		if ( $action == 'image_resize' ) {
+			$this->imageId = get_query_var( 'image_id' );
+			$this->imageWidth = get_query_var( 'width' );
+			$this->imageHeight = get_query_var( 'height' );
+			$this->imagePath = get_attached_file( $this->imageId );
+
+			$this->resizeImage( $this->imagePath, $this->imageWidth, $this->imageHeight, $imageOptions = false );
 		}
 	}
 
-	public function ajaxHeader() {
-		wp_localize_script( 'jquery', 'ajaxurl',
-				array(
-					'url' => admin_url( 'admin-ajax.php' )
-				)
-		);
-	}
-
-	public function resizeActionJavascript() {
-
-		$var = "<script>
-			jQuery(document).ready(function ($) {
-			var getUrlParameter = function getUrlParameter(sParam) {
-			var sPageURL = window.location.search.substring(1),
-				sURLVariables = sPageURL.split('&'),
-				sParameterName,
-				i;
-
-			for (i = 0; i < sURLVariables.length; i++) {
-				sParameterName = sURLVariables[i].split('=');
-
-				if (sParameterName[0] === sParam) {
-					return sParameterName[1] === undefined ? true : decodeURIComponent(sParameterName[1]);
-				}
-			}
-		};
-				var data = {
-					action: getUrlParameter('action'),
-					image_id: getUrlParameter('image_id'),
-					width: getUrlParameter('width'),
-					height: getUrlParameter('height')			
-				};
-
-				jQuery.post(ajaxurl, data, function (response) {
-					console.log('Получено с сервера: ' + response);
-				});
-			});
-		</script>";
-
-		echo $var;
-	}
-
-	public static function resizeActionCallback() {
-		$image_id = intval( filter_input( INPUT_POST, 'image_id' ) );
-		$image_width = intval( filter_input( INPUT_POST, 'width' ) );
-		$image_height = intval( filter_input( INPUT_POST, 'height' ) );
-		$image_path = get_attached_file( $image_id );
-		
-		$resize = new ResizeImage( $image_path );
-		$resize->resizeTo( $image_width, $image_height, 'exact' );
-		$resize->saveImage( $image_path, "100", true );
-
-		wp_die();
+	public function resizeImage( $path, $imageWidth, $imageHeight, $imageOptions = false ) {
+		$image = wp_get_image_editor( $path );
+		if ( !is_wp_error( $image ) ) {
+			//$image->rotate( 90 );
+			$image->resize( $imageWidth, $imageHeight, $imageOptions );
+			$image->stream( $mime_type = 'image/png' );
+		}
 	}
 
 }
 
 ResizeAJAX::resizeInit();
-
